@@ -1,0 +1,32 @@
+{% include 'base.html' %}
+
+{% load static %}
+
+{% block title %}
+    <title>View DataFrame</title>
+{% endblock title %}
+
+{% block csss %}
+<style type="text/css">
+    
+</style>
+{% endblock csss %}
+
+
+{% block container %}
+<div class="container">
+    <h3 class="h3">Overview of the dataSet</h3>
+    <div class="row">
+        {{ df|safe }}
+    </div>
+
+</div>
+
+
+
+
+{% endblock container %}
+
+
+
+
