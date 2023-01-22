@@ -1,0 +1,59 @@
+{% include 'base.html' %}
+
+{% load static %}
+
+{% block title %}
+    <title>Select Model to Train</title>
+{% endblock title %}
+
+{% block csss %}
+<style type="text/css">
+    legend{
+            font-size: 3rem;
+            font-weight: 600;
+            background: -webkit-linear-gradient(#191922,#17a2b8);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+       
+        label{
+            color: #97B4B4;
+        }
+        div{
+            color: #97B4B4;
+        }
+        select,select:focus{
+            background-color: #101316;
+            color: #fff;
+        }
+        option,option:focus{
+            background-color: #101316;
+            color: #fff;
+        }
+
+</style>
+{% endblock csss %}
+
+
+{% block container %}
+<div class="container">
+    <div class="row">
+        <div class="col-md-6">
+            <button class="btn btn-outline">LSTM MODEL</button>
+        </div>
+        <div class="col-md-6">
+            <button class="btn btn-outline">GRU MODEL</button>
+        </div>
+
+    </div>
+
+</div>
+
+
+
+
+{% endblock container %}
+
+
+
+

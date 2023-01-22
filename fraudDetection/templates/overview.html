@@ -1,0 +1,56 @@
+{% include 'base.html' %}
+
+{% load static %}
+
+{% block title %}
+    <title>View DataFrame</title>
+{% endblock title %}
+
+{% block csss %}
+<style type="text/css">
+    
+</style>
+{% endblock csss %}
+
+
+{% block container %}
+<div class="container">
+    <h3 class="h3">Overview of the dataSet</h3>
+    <div class="row">
+        {{ df|safe }}
+    </div>
+
+    <div class="container mt-4 p-2">
+        <div class="d-flex justify-content-center">
+            <h3 class="h3 text-dark">
+                GRU Based Graph Model 
+            </h3>
+        </div>
+        <div class="d-flex justify-content-center">
+            <img class="img-fluid center-block" src="{% static 'model.png' %}" alt="Model Overview">
+        </div>
+    </div>
+
+    <div class="container mt-4 p-2">
+        <div class="d-flex justify-content-center">
+            <h3 class="h3 text-dark">
+                New Model after tesing
+            </h3>
+        </div>
+        <div class="d-flex justify-content-center">
+            <img class="img-fluid center-block" src="{% static 'model2.png' %}" alt="Model Overview">
+        </div>
+    </div>
+
+
+
+</div>
+
+
+
+
+{% endblock container %}
+
+
+
+
