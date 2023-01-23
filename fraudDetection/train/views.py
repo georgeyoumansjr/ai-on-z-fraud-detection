@@ -34,7 +34,9 @@ class RunSimulation:
 
     def __init__(self, filePath):
         self.filePath = filePath
-        self.filePath = os.path.join(settings.MEDIA_ROOT, "csvs\\card_transaction.v2.csv")
+        if not self.filePath:
+            self.filePath = os.path.join(settings.MEDIA_ROOT, "csvs\\card_transaction.v2.csv")
+        print(self.filePath)
         self.df = pd.read_csv(self.filePath)
         self.df = self.preArrange(self.df)
         # self.save_dir = os.path.join(settings.MEDIA_ROOT,'saved_models\\P\\ccf_220_keras_gru_static/1')
@@ -133,17 +135,21 @@ class RunSimulation:
 def overview(request):
     # path = os.path.join(settings.MEDIA_ROOT, "card_transaction.v2.csv")
     # print(path)
-    tdf = RunSimulation("card_transaction.v2.csv")
+    print("FileName in Overview")
+    id = request.session["id"]
+    print("Id is "+str(id))
+    overD = ModelF.objects.get(id=id)
+    filePath = settings.MEDIA_URL + overD.csv_file
+    print(filePath)
+    tdf = RunSimulation(filePath)
     img = os.path.abspath(os.path.join(settings.BASE_DIRV,"model.png"))
     print(settings.BASE_DIRV)
-    with open(os.path.abspath(os.path.join(settings.BASE_DIRV,"metrics.json")),'r')
-    # metrics =
-    data = json.loads()
-    # print(tdf)
-    # tdf['Merchant Name'] = tdf['Merchant Name'].astype(str)
-    # tdf['Merchant City'] = tdf['Merchant City'].astype(str)
-    # tdf.sort_values(by=['User','Card'], inplace=True)
-    # tdf.reset_index(inplace=True, drop=True)
+    with open(os.path.abspath(os.path.join(settings.BASE_DIRV,"metrics.json")),'r') as fileR:
+        fileR = json.loads(fileR)
+    
+
+    print(fileR)
+   
     tdfH = tdf.getDf().head(20)
 
     # print(tdf.info().to_html())
@@ -156,14 +162,18 @@ def overview(request):
 
 def uploadView(request):
     return 
+from django.forms.models import model_to_dict
 
 def addCsvView(request):
     if request.method == 'POST':
         # form = UserCreationForm(request.POST)
         form = AddCsvFile(request.POST,request.FILES)
         if form.is_valid():
-            cFile, created = ModelF.objects.get_or_create(**form.cleaned_data)
-            return redirect('upload')
+            cFile,created = ModelF.objects.get_or_create(**form.cleaned_data)
+            
+            request.session["id"] = cFile.id
+            print("Id is " + str(cFile.id))
+            return redirect('overview')
     else:
         # form = UserCreationForm()
         form = AddCsvFile()

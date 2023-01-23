@@ -1,4 +1,5 @@
 from django.db import models
+import os
 
 # Create your models here.
 
@@ -12,6 +13,9 @@ class ModelF(models.Model):
 
     def __str__(self):
         return self.file_name
+    
+    def filename(self):
+        return os.path.basename(self.csv_file.name)
 
 
 

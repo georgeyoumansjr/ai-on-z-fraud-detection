@@ -26,7 +26,7 @@ def index(request):
 
 
 urlpatterns = [
-    path('',index),
+    path('',index,name="base"),
     path('train/',include('train.urls')),
     path("admin/", admin.site.urls),
 ]

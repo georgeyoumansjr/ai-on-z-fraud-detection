@@ -33,6 +33,14 @@
             <h1 class="h1 text-dark">Fraud Detection application</h1>
           </div>
         </div>
+        {% url 'base' as the_url %}
+        {% if request.get_full_path == the_url %}
+        <div class="row justify-content-center mt-4 p-5 mb-3">
+          <div class="col-md-6">
+            <a class="btn btn-outline-primary w-100" href="{% url 'upload' %}">Get Started</a>
+          </div>
+        </div>
+        {% endif %}
         {% block content %}{% endblock %}
       </div>
     </section>

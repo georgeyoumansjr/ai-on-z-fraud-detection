@@ -9,7 +9,7 @@
 {% block csss %}
 <style type="text/css">
     legend{
-            font-size: 3rem;
+            font-size: 2rem;
             font-weight: 600;
             background: -webkit-linear-gradient(#191922,#17a2b8);
             -webkit-background-clip: text;
@@ -36,12 +36,12 @@
 
 {% load crispy_forms_tags %}
 {% block container %}
-<div class="container">
-    <div class="col-md-8">
+<div class="row justify-content-center mt-5">
+    <div class="col-md-6">
         <form method="POST" enctype="multipart/form-data">
             {% csrf_token %}
             <fieldset class="form-group">
-                <legend class="border-bottom mb-4 main-t">Add File to generate Model</legend>
+                <legend class="border-bottom mb-4 main-t">Add File to Get an Overview</legend>
                 {{ form|crispy }}
             </fieldset>
             <div class="form-group">
