@@ -38,7 +38,7 @@ class RunSimulation:
             self.filePath = os.path.join(settings.MEDIA_ROOT, "csvs\\card_transaction.v2.csv")
         print(self.filePath)
         self.df = pd.read_csv(self.filePath)
-        self.df = self.preArrange(self.df)
+        # self.df = self.preArrange(self.df)
         # self.save_dir = os.path.join(settings.MEDIA_ROOT,'saved_models\\P\\ccf_220_keras_gru_static/1')
 
         # # Get first of each User-Card combination
@@ -137,24 +137,27 @@ def overview(request):
     # print(path)
     print("FileName in Overview")
     id = request.session["id"]
-    print("Id is "+str(id))
+    # print("Id is "+str(id))
     overD = ModelF.objects.get(id=id)
-    filePath = settings.MEDIA_URL + overD.csv_file
-    print(filePath)
-    tdf = RunSimulation(filePath)
+    # filePath = settings.MEDIA_URL + overD.csv_file
+    # print(filePath)
+    tdf = RunSimulation(overD.csv_file)
     img = os.path.abspath(os.path.join(settings.BASE_DIRV,"model.png"))
-    print(settings.BASE_DIRV)
-    with open(os.path.abspath(os.path.join(settings.BASE_DIRV,"metrics.json")),'r') as fileR:
-        fileR = json.loads(fileR)
+    # print(settings.BASE_DIRV)
+    json_f = open(os.path.abspath(os.path.join(settings.BASE_DIRV,"metrics.json")),'r')
+    fileR = json.load(json_f)
     
-
-    print(fileR)
-   
+    # print(fileR)
+    
     tdfH = tdf.getDf().head(20)
-
+    fields = {k:str(v[0]) for k,v in pd.DataFrame(tdfH.dtypes).T.to_dict('list').items()}
+    tdfH = tdfH.style.set_table_attributes('class="table table-info table-striped"')
+    # print(fields)
     # print(tdf.info().to_html())
     mydict = {
         "df": tdfH.to_html(index=False),
+        "metrics": fileR["metrics"],
+        "fields": fields,
         "img": img
     }
     return render(request,'overview.html',context=mydict)
