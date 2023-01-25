@@ -76,6 +76,32 @@ class RunSimulation:
         self.df.sort_values(by=['User','Card'], inplace=True)
         self.df.reset_index(inplace=True, drop=True)
         return self.df
+
+    def testEvaluation(self):
+        batch_size = 2000
+
+        input_size=220
+        output_size=1
+        units=[200,200]
+
+        tf_input = ([batch_size, input_size])
+        save_dir = 'saved_models/P/ccf_220_keras_gru_static/1'
+
+        new_model = tf.keras.models.Sequential([
+            tf.keras.layers.GRU(units[0], input_shape=tf_input, batch_size=7, time_major=True, return_sequences=True),
+            tf.keras.layers.GRU(units[1], return_sequences=True, time_major=True),
+            tf.keras.layers.Dense(output_size, activation='sigmoid')
+        ])
+        new_model.load_weights(os.path.join(settings.BASE_DIRV,save_dir,"wts"))
+        new_model.compile(optimizer='adam', loss='binary_crossentropy', metrics=metrics)
+        ddf = pd.read_csv(self.filePath, dtype={"Merchant Name":"str"}, index_col='Index')
+        indices = np.loadtxt(os.path.join(settings.BASE_DIRV, "test_220_100k.indices"))
+        batch_size = 2000
+        print("\nQuick test")
+        test_generate = gen_test_batch(ddf,mapper,indices,batch_size)
+        score = new_model.evaluate(test_generate, verbose=1)
+        return score
+
     
     def create_test_sample(self,df, indices):
         print(indices)
@@ -133,27 +159,23 @@ class RunSimulation:
 
 
 def overview(request):
-    # path = os.path.join(settings.MEDIA_ROOT, "card_transaction.v2.csv")
-    # print(path)
+    
     print("FileName in Overview")
     id = request.session["id"]
-    # print("Id is "+str(id))
     overD = ModelF.objects.get(id=id)
-    # filePath = settings.MEDIA_URL + overD.csv_file
-    # print(filePath)
+   
     tdf = RunSimulation(overD.csv_file)
+    evaluatedR = tdf.
     img = os.path.abspath(os.path.join(settings.BASE_DIRV,"model.png"))
-    # print(settings.BASE_DIRV)
+    
     json_f = open(os.path.abspath(os.path.join(settings.BASE_DIRV,"metrics.json")),'r')
     fileR = json.load(json_f)
     
-    # print(fileR)
     
     tdfH = tdf.getDf().head(20)
     fields = {k:str(v[0]) for k,v in pd.DataFrame(tdfH.dtypes).T.to_dict('list').items()}
     tdfH = tdfH.style.set_table_attributes('class="table table-info table-striped"')
-    # print(fields)
-    # print(tdf.info().to_html())
+    
     mydict = {
         "df": tdfH.to_html(index=False),
         "metrics": fileR["metrics"],
@@ -161,13 +183,15 @@ def overview(request):
         "img": img
     }
     return render(request,'overview.html',context=mydict)
-    # return HttpResponse(tdfH.to_html(index=False))
+    
 
 def uploadView(request):
     return 
 from django.forms.models import model_to_dict
 
 def addCsvView(request):
+    save_dir = 'saved_models\\P\\ccf_220_keras_gru_static\\1'
+    print(os.path.join(settings.BASE_DIRV,save_dir,"wts"))
     if request.method == 'POST':
         # form = UserCreationForm(request.POST)
         form = AddCsvFile(request.POST,request.FILES)
