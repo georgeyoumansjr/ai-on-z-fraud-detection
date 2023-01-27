@@ -30,6 +30,23 @@ from sklearn.preprocessing import MinMaxScaler
 from sklearn.preprocessing import LabelBinarizer
 from sklearn.impute import SimpleImputer
 
+
+class TP(tf.keras.metrics.TruePositives):
+    def update_state(self, y_true, y_pred, sample_weight=None):
+        super().update_state(y_true[-1,:,:], y_pred[-1,:,:], sample_weight)
+
+class FP(tf.keras.metrics.FalsePositives):
+    def update_state(self, y_true, y_pred, sample_weight=None):
+        super().update_state(y_true[-1,:,:], y_pred[-1,:,:], sample_weight)
+
+class FN(tf.keras.metrics.FalseNegatives):
+    def update_state(self, y_true, y_pred, sample_weight=None):
+        super().update_state(y_true[-1,:,:], y_pred[-1,:,:], sample_weight)
+
+class TN(tf.keras.metrics.TrueNegatives):
+    def update_state(self, y_true, y_pred, sample_weight=None):
+        super().update_state(y_true[-1,:,:], y_pred[-1,:,:], sample_weight)
+"""
 class RunSimulation:
 
     def __init__(self, filePath):
@@ -37,7 +54,8 @@ class RunSimulation:
         if not self.filePath:
             self.filePath = os.path.join(settings.MEDIA_ROOT, "csvs\\card_transaction.v2.csv")
         print(self.filePath)
-        self.df = pd.read_csv(self.filePath)
+        self.df = pd.read_csv(self.filePath,dtype={"Merchant Name":"str"}, index_col='Index')
+        self.mapper = joblib.load(open(os.path.join(settings.BASE_DIRV,'fitted_mapper.pkl'),'rb'))
         # self.df = self.preArrange(self.df)
         # self.save_dir = os.path.join(settings.MEDIA_ROOT,'saved_models\\P\\ccf_220_keras_gru_static/1')
 
@@ -77,30 +95,9 @@ class RunSimulation:
         self.df.reset_index(inplace=True, drop=True)
         return self.df
 
-    def testEvaluation(self):
-        batch_size = 2000
+    
 
-        input_size=220
-        output_size=1
-        units=[200,200]
 
-        tf_input = ([batch_size, input_size])
-        save_dir = 'saved_models/P/ccf_220_keras_gru_static/1'
-
-        new_model = tf.keras.models.Sequential([
-            tf.keras.layers.GRU(units[0], input_shape=tf_input, batch_size=7, time_major=True, return_sequences=True),
-            tf.keras.layers.GRU(units[1], return_sequences=True, time_major=True),
-            tf.keras.layers.Dense(output_size, activation='sigmoid')
-        ])
-        new_model.load_weights(os.path.join(settings.BASE_DIRV,save_dir,"wts"))
-        new_model.compile(optimizer='adam', loss='binary_crossentropy', metrics=metrics)
-        ddf = pd.read_csv(self.filePath, dtype={"Merchant Name":"str"}, index_col='Index')
-        indices = np.loadtxt(os.path.join(settings.BASE_DIRV, "test_220_100k.indices"))
-        batch_size = 2000
-        print("\nQuick test")
-        test_generate = gen_test_batch(ddf,mapper,indices,batch_size)
-        score = new_model.evaluate(test_generate, verbose=1)
-        return score
 
     
     def create_test_sample(self,df, indices):
@@ -150,12 +147,65 @@ class RunSimulation:
         mapper.fit(self.df)
 
         joblib.dump(mapper, open(os.path.join(settings.MEDIA_ROOT,'fitted_mapper.pkl'),'wb'))
+"""
+def readDf(fileP):
+    df = pd.read_csv(fileP,dtype={"Merchant Name":"str"}, index_col='Index')
+    return df
+mapper = joblib.load(open(os.path.join(settings.BASE_DIRV,'fitted_mapper.pkl'),'rb'))
 
+def gen_test_batch(df, mapper, indices, batch_size):
+    rows = indices.shape[0]
+    index_array = np.zeros((rows, seq_length), dtype=np.int)
+    for i in range(seq_length):
+        index_array[:,i] = indices + 1 - seq_length + i
+    count = 0
+    while (count + batch_size <= rows):        
+        full_df = mapper.transform(df.loc[index_array[count:count+batch_size].flatten()])
+        data = full_df.drop(['Is Fraud?'],axis=1).to_numpy().reshape(batch_size, seq_length, -1)
+        targets = full_df['Is Fraud?'].to_numpy().reshape(batch_size, seq_length, 1)
+        count += batch_size
+        data_t = np.transpose(data, axes=(1,0,2))
+        targets_t = np.transpose(targets, axes=(1,0,2))
+        yield data_t, targets_t
 
+metrics=['accuracy', 
+        TP(name='TP'),
+        FP(name='FP'),
+        FN(name='FN'),
+        TN(name='TN'),
+        tf.keras.metrics.TruePositives(name='tp'),
+        tf.keras.metrics.FalsePositives(name='fp'),
+        tf.keras.metrics.FalseNegatives(name='fn'),
+        tf.keras.metrics.TrueNegatives(name='tn')
+    ]
+def testEvaluation(filep):
+    # import numpy as np
+    # self.filep =os.path.join(settings.MEDIA_ROOT,filep)
+    
+    batch_size = 2000
 
+    input_size=220
+    output_size=1
+    units=[200,200]
 
+    tf_input = ([batch_size, input_size])
+    save_dir = 'saved_models\\P\\ccf_220_keras_gru_static\\1'
 
-
+    new_model = tf.keras.models.Sequential([
+        tf.keras.layers.GRU(units[0], input_shape=tf_input, batch_size=7, time_major=True, return_sequences=True),
+        tf.keras.layers.GRU(units[1], return_sequences=True, time_major=True),
+        tf.keras.layers.Dense(output_size, activation='sigmoid')
+    ])
+    new_model.load_weights(os.path.join(settings.BASE_DIRV,save_dir,"wts"))
+    new_model.compile(optimizer='adam', loss='binary_crossentropy', metrics=metrics)
+    ddf = pd.read_csv(filep,dtype={"Merchant Name":"str"}, index_col='Index')
+    # ddf = filep
+    indices = np.loadtxt(os.path.join(settings.BASE_DIRV, "test_220_100k.indices"))
+    batch_size = 2000
+    print("\nQuick test")
+    test_generate = gen_test_batch(ddf,mapper,indices,batch_size)
+    score = new_model.evaluate(test_generate, verbose=1)
+    return score
 
 
 def overview(request):
@@ -164,21 +214,28 @@ def overview(request):
     id = request.session["id"]
     overD = ModelF.objects.get(id=id)
    
-    tdf = RunSimulation(overD.csv_file)
-    evaluatedR = tdf.
+    # tdf = RunSimulation(overD.csv_file)
+   
+    # evaluatedR = testEvaluation(tdf.getDf())
+    # print(evaluatedR)
     img = os.path.abspath(os.path.join(settings.BASE_DIRV,"model.png"))
     
     json_f = open(os.path.abspath(os.path.join(settings.BASE_DIRV,"metrics.json")),'r')
     fileR = json.load(json_f)
     
+    evaluatedR = testEvaluation(overD.csv_file)
+
+    tdf = readDf(overD.csv_file)
+
     
-    tdfH = tdf.getDf().head(20)
+    tdfH = tdf.head(20)
     fields = {k:str(v[0]) for k,v in pd.DataFrame(tdfH.dtypes).T.to_dict('list').items()}
     tdfH = tdfH.style.set_table_attributes('class="table table-info table-striped"')
     
     mydict = {
         "df": tdfH.to_html(index=False),
         "metrics": fileR["metrics"],
+        "score": evaluatedR,
         "fields": fields,
         "img": img
     }
@@ -190,8 +247,8 @@ def uploadView(request):
 from django.forms.models import model_to_dict
 
 def addCsvView(request):
-    save_dir = 'saved_models\\P\\ccf_220_keras_gru_static\\1'
-    print(os.path.join(settings.BASE_DIRV,save_dir,"wts"))
+    # save_dir = 'saved_models\\P\\ccf_220_keras_gru_static\\1'
+    # print(os.path.join(settings.BASE_DIRV,save_dir,"wts"))
     if request.method == 'POST':
         # form = UserCreationForm(request.POST)
         form = AddCsvFile(request.POST,request.FILES)
