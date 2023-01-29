@@ -8,7 +8,7 @@ from .forms import AddCsvFile
 
 import tensorflow as tf
 from tensorflow import keras
-import numpy as np
+
 import pandas as pd
 import math
 import os
@@ -95,6 +95,29 @@ class RunSimulation:
         self.df.reset_index(inplace=True, drop=True)
         return self.df
 
+    def gen_test_batch(df, mapper, indices, batch_size):
+        mapper = joblib.load(open(os.path.join(settings.BASE_DIRV,'fitted_mapper.pkl'),'rb'))
+        batch_size = 2000
+        seq_length = 7 
+        rows = indices.shape[0]
+        index_array = np.zeros((rows, seq_length), dtype=int)
+        print(index_array)
+        print(df)
+        for i in range(seq_length):
+            index_array[:,i] = indices + 1 - seq_length + i
+        count = 0
+        while (count + batch_size <= rows):        
+            full_df = mapper.transform(df.loc[index_array[count:count+batch_size].flatten()])
+            sleep(2)
+            print(full_df)
+            data = full_df.drop(['Is Fraud?'],axis=1).to_numpy().reshape(batch_size, seq_length, -1)
+            targets = full_df['Is Fraud?'].to_numpy().reshape(batch_size, seq_length, 1)
+            count += batch_size
+            data_t = np.transpose(data, axes=(1,0,2))
+            targets_t = np.transpose(targets, axes=(1,0,2))
+            yield data_t, targets_t
+
+
     
 
 
@@ -148,26 +171,9 @@ class RunSimulation:
 
         joblib.dump(mapper, open(os.path.join(settings.MEDIA_ROOT,'fitted_mapper.pkl'),'wb'))
 """
-def readDf(fileP):
-    df = pd.read_csv(fileP,dtype={"Merchant Name":"str"}, index_col='Index')
-    return df
-mapper = joblib.load(open(os.path.join(settings.BASE_DIRV,'fitted_mapper.pkl'),'rb'))
 
-def gen_test_batch(df, mapper, indices, batch_size):
-    rows = indices.shape[0]
-    index_array = np.zeros((rows, seq_length), dtype=np.int)
-    for i in range(seq_length):
-        index_array[:,i] = indices + 1 - seq_length + i
-    count = 0
-    while (count + batch_size <= rows):        
-        full_df = mapper.transform(df.loc[index_array[count:count+batch_size].flatten()])
-        data = full_df.drop(['Is Fraud?'],axis=1).to_numpy().reshape(batch_size, seq_length, -1)
-        targets = full_df['Is Fraud?'].to_numpy().reshape(batch_size, seq_length, 1)
-        count += batch_size
-        data_t = np.transpose(data, axes=(1,0,2))
-        targets_t = np.transpose(targets, axes=(1,0,2))
-        yield data_t, targets_t
 
+import numpy as np
 metrics=['accuracy', 
         TP(name='TP'),
         FP(name='FP'),
@@ -178,6 +184,87 @@ metrics=['accuracy',
         tf.keras.metrics.FalseNegatives(name='fn'),
         tf.keras.metrics.TrueNegatives(name='tn')
     ]
+def readDf(fileP):
+    df = pd.read_csv(fileP,dtype={"Merchant Name":"str"}, index_col='Index')
+    return df
+
+def timeEncoder(X):
+    X_hm = X['Time'].str.split(':', expand=True)
+    d = pd.to_datetime(dict(year=X['Year'],month=X['Month'],day=X['Day'],hour=X_hm[0],minute=X_hm[1]))
+    d = d.values.astype(int)
+    print(d.dtype)
+    d = d.astype(int)
+    return pd.DataFrame(d)
+
+def amtEncoder(X):
+    amt = X.apply(lambda x: x[1:]).astype(float).map(lambda amt: max(1,amt)).map(math.log)
+    return pd.DataFrame(amt)
+
+def decimalEncoder(X,length=5):
+    dnew = pd.DataFrame()
+    for i in range(length):
+        dnew[i] = np.mod(X,10) 
+        X = np.floor_divide(X,10)
+    return dnew
+
+def fraudEncoder(X):
+    return np.where(X == 'Yes', 1, 0).astype(int)
+
+def generateMapper():
+    from sklearn_pandas import DataFrameMapper
+    from sklearn.preprocessing import LabelEncoder
+    from sklearn.preprocessing import OneHotEncoder
+    from sklearn.preprocessing import FunctionTransformer
+    from sklearn.preprocessing import MinMaxScaler
+    from sklearn.preprocessing import LabelBinarizer
+    from sklearn.impute import SimpleImputer
+
+    mapper = DataFrameMapper([
+                            ('Is Fraud?', FunctionTransformer(fraudEncoder)),
+                            (['Merchant State'], [SimpleImputer(strategy='constant'), FunctionTransformer(np.ravel),
+                                                LabelEncoder(), FunctionTransformer(decimalEncoder), OneHotEncoder()]),
+                            (['Zip'], [SimpleImputer(strategy='constant'), FunctionTransformer(np.ravel),
+                                        FunctionTransformer(decimalEncoder), OneHotEncoder()]),
+                            ('Merchant Name', [LabelEncoder(), FunctionTransformer(decimalEncoder), OneHotEncoder()]),
+                            ('Merchant City', [LabelEncoder(), FunctionTransformer(decimalEncoder), OneHotEncoder()]),
+                            ('MCC', [LabelEncoder(), FunctionTransformer(decimalEncoder), OneHotEncoder()]),
+                            (['Use Chip'], [SimpleImputer(strategy='constant'), LabelBinarizer()]),
+                            (['Errors?'], [SimpleImputer(strategy='constant'), LabelBinarizer()]),
+                            (['Year','Month','Day','Time'], [FunctionTransformer(timeEncoder), MinMaxScaler()]),
+                            ('Amount', [FunctionTransformer(amtEncoder), MinMaxScaler()])
+                            ], input_df=True, df_out=True)
+    mapper.fit(tdf)
+
+    joblib.dump(mapper, open('fitted_mapper.pkl','wb'))
+
+
+
+mapper = joblib.load(open(os.path.join(settings.BASE_DIRV,'fitted_mapper.pkl'),'rb'))
+
+
+
+seq_length = 7
+# import numpy as np
+def gen_test_batch(df, mapper, indices, batch_size):
+    mapper = joblib.load(open(os.path.join(settings.BASE_DIRV,'fitted_mapper.pkl'),'rb'))
+    rows = indices.shape[0]
+    index_array = np.zeros((rows, seq_length), dtype=int)
+    for i in range(seq_length):
+        index_array[:,i] = indices + 1 - seq_length + i
+    count = 0
+    while (count + batch_size <= rows):        
+        arr = index_array[count:count+batch_size].flatten()
+        print(arr)
+        full_df = mapper.transform(df.loc[arr])
+        data = full_df.drop(['Is Fraud?'],axis=1).to_numpy().reshape(batch_size, seq_length, -1)
+        targets = full_df['Is Fraud?'].to_numpy().reshape(batch_size, seq_length, 1)
+        count += batch_size
+        data_t = np.transpose(data, axes=(1,0,2))
+        targets_t = np.transpose(targets, axes=(1,0,2))
+        yield data_t, targets_t
+
+
+save_dir = 'saved_models\\P\\ccf_220_keras_gru_static\\1'
 def testEvaluation(filep):
     # import numpy as np
     # self.filep =os.path.join(settings.MEDIA_ROOT,filep)
@@ -187,24 +274,27 @@ def testEvaluation(filep):
     input_size=220
     output_size=1
     units=[200,200]
+    mapper = joblib.load(open(os.path.join(settings.BASE_DIRV,'fitted_mapper.pkl'),'rb'))
 
     tf_input = ([batch_size, input_size])
-    save_dir = 'saved_models\\P\\ccf_220_keras_gru_static\\1'
 
     new_model = tf.keras.models.Sequential([
         tf.keras.layers.GRU(units[0], input_shape=tf_input, batch_size=7, time_major=True, return_sequences=True),
         tf.keras.layers.GRU(units[1], return_sequences=True, time_major=True),
         tf.keras.layers.Dense(output_size, activation='sigmoid')
     ])
+
     new_model.load_weights(os.path.join(settings.BASE_DIRV,save_dir,"wts"))
     new_model.compile(optimizer='adam', loss='binary_crossentropy', metrics=metrics)
-    ddf = pd.read_csv(filep,dtype={"Merchant Name":"str"}, index_col='Index')
+    ddf = pd.read_csv(filep, index_col='Index')
     # ddf = filep
+    print(os.path.join(settings.BASE_DIRV,save_dir,"wts"))
     indices = np.loadtxt(os.path.join(settings.BASE_DIRV, "test_220_100k.indices"))
+    print(indices)
     batch_size = 2000
     print("\nQuick test")
     test_generate = gen_test_batch(ddf,mapper,indices,batch_size)
-    score = new_model.evaluate(test_generate, verbose=1)
+    score = new_model.evaluate(test_generate, verbose=0)
     return score
 
 
